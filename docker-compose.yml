@@ -1,0 +1,59 @@
+version: '3'
+services:
+  db:
+    image: mysql/mysql-server:latest
+    container_name: wp_db
+    restart: unless-stopped
+    env_file: .env
+    # environment:
+    #   MYSQL_DATABASE: ${MYSQL_DATABASE:-wordpress}
+    #   MYSQL_USER: ${MYSQL_USER:-wordpress}
+    #   MYSQL_PASSWORD: ${MYSQL_PASSWORD:-wordpress_password}
+    #   MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-toor}
+    volumes:
+      - "/etc/timezone:/etc/timezone:ro"
+      - "/etc/localtime:/etc/localtime:ro"
+      - ./database:/var/lib/mysql
+
+  preinstall:
+    image: php:8.2-fpm
+    env_file: .env
+    # environment:
+    #   DEBIAN_FRONTEND: ${DEBIAN_FRONTEND:-noninteractive}
+    #   MYSQL_DATABASE: ${MYSQL_DATABASE:-wordpress}
+    #   MYSQL_USER: ${MYSQL_USER:-wordpress}
+    #   MYSQL_PASSWORD: ${MYSQL_PASSWORD:-wordpress_password}
+    entrypoint: bash /preinstall.sh
+    volumes:
+      - ./preinstall.sh:/preinstall.sh
+      - ./wp_files:/var/www/html
+
+  app:
+    image: wp-php82-fpm
+    container_name: wp_app
+    build:
+      context: wp
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    volumes:
+      - "/etc/timezone:/etc/timezone:ro"
+      - "/etc/localtime:/etc/localtime:ro"
+      - ./wp_files:/var/www/html
+    links:
+      - preinstall
+
+  web:
+    image: nginx:latest
+    container_name: wp_web
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - "/etc/timezone:/etc/timezone:ro"
+      - "/etc/localtime:/etc/localtime:ro"
+      - ./wp_files:/var/www/html
+      - ./web/nginx.conf:/etc/nginx/nginx.conf
+      - ./web/default.conf:/etc/nginx/conf.d/default.conf
+    links:
+      - preinstall
